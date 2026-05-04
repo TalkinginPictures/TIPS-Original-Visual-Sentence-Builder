@@ -1,0 +1,403 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>AAC Symbol Builder — Emoji Plus v3.2 (Skin Tones)</title>
+
+<style>
+/* ---------- BASIC UI + LAYOUT ---------- */
+:root {
+  --ok:#1b8a5a; --nc:#c46a00; --unk:#666;
+  --tile:#f9f9f9; --border:#999; --accent:#4CAF50;
+}
+*{box-sizing:border-box}
+body{font-family:Arial,sans-serif;margin:0;}
+
+/* Top bar */
+#top-section{background:#f1f1f1;padding:16px 20px;}
+#top-section h1{text-align:center;margin:0 0 6px;}
+.controls{display:flex;flex-wrap:wrap;gap:8px;justify-content:center;align-items:center;}
+.controls input[type=text]{padding:10px;width:260px;}
+.controls button{padding:10px 14px;}
+.controls label{font-size:14px;display:flex;align-items:center;gap:4px;}
+fieldset{border:1px solid #ddd;border-radius:6px;padding:8px 12px;}
+legend{padding:0 4px;}
+.small-note{font-size:12px;text-align:center;color:#444;margin-top:4px;}
+
+.repo-filter, .emoji-filter, .tone-filter{
+  display:flex;flex-wrap:wrap;gap:14px;justify-content:center;margin-top:10px;
+}
+
+/* Sentence area */
+#sentence-section{text-align:center;margin-top:10px;}
+#sentence{
+  display:flex;flex-wrap:wrap;justify-content:center;
+  gap:20px;padding:15px;border:2px dashed var(--border);
+  background:var(--tile);margin:10px auto;max-width:95%;
+}
+.sentence-img{max-width:120px;border:2px solid var(--accent);}
+.sentence-label{font-size:16px;margin-top:6px;text-align:center;}
+
+/* Results grid */
+#results{
+  display:grid;
+  grid-template-columns:repeat(auto-fill,minmax(150px,1fr));
+  gap:14px;padding:12px 16px 30px;
+  max-width:1200px;margin:0 auto;
+}
+.result{
+  background:#fff;border:1px solid #ddd;border-radius:8px;
+  padding:8px;text-align:center;display:flex;flex-direction:column;gap:6px;
+}
+.result img{max-width:120px;cursor:pointer;}
+.glyph{font-size:80px;cursor:pointer;line-height:1;}
+
+.badge{
+  font-size:11px;line-height:1.25;padding:6px 8px;
+  border-radius:6px;color:#fff;margin-top:auto;
+  display:flex;flex-direction:column;gap:2px;
+}
+.ok{background:var(--ok);}
+.nc{background:var(--nc);}
+.unk{background:var(--unk);}
+.badge .small{font-size:10px;opacity:.95;}
+
+/* Tone swatches */
+.tone-swatch{display:inline-block;width:18px;height:18px;border-radius:50%;border:1px solid #999;}
+.tone-1{background:#FAD7C8;} /* light */
+.tone-2{background:#E8C3A0;}
+.tone-3{background:#CE9C6B;}
+.tone-4{background:#A56C43;}
+.tone-5{background:#70432A;}
+
+#attribution{text-align:center;font-size:12px;color:#555;margin:10px;}
+</style>
+
+<!-- html2canvas for Save Sentence -->
+https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js
+</head>
+
+<body>
+
+<!-- ---------- UI ---------- -->
+<section id="top-section">
+  <h1>AAC Symbol Builder — Emoji + Skin Tones (v3.2)</h1>
+
+  <div class="controls">
+    <input id="wordInput" type="text" placeholder="Search word… (e.g., thumbs up)" />
+    <button id="btnSearch">Search</button>
+    <button id="btnSpeak">Speak</button>
+    <button id="btnSave">Save Sentence</button>
+    <button id="btnClear">Clear</button>
+    <label><input id="filterSafe" type="checkbox" /> Publication-safe only</label>
+    <span>Try: <a id="demoDog" style="cursor:pointer;">thumbs up</a></span>
+  </div>
+
+  <fieldset class="emoji-filter">
+    <legend>Emoji image libraries</legend>
+    <label><input class="emoji-lib" type="checkbox" value="twemoji" checked /> Twemoji</label>
+    <label><input class="emoji-lib" type="checkbox" value="openmoji" checked /> OpenMoji</label>
+    <label><input class="emoji-lib" type="checkbox" value="noto" checked /> Noto Emoji</label>
+    <label><input id="toggleEmojiGlyph" type="checkbox" checked /> Show glyph</label>
+    <div class="small-note">Data: Emojibase (MIT)</div>
+  </fieldset>
+
+  <fieldset class="tone-filter">
+    <legend>Skin tone preference</legend>
+    <label><input type="radio" name="skinToneOpt" value="none" checked /> Neutral</label>
+    <label><input type="radio" name="skinToneOpt" value="1F3FB" /> <span class="tone-swatch tone-1"></span> Light</label>
+    <label><input type="radio" name="skinToneOpt" value="1F3FC" /> <span class="tone-swatch tone-2"></span> Med‑light</label>
+    <label><input type="radio" name="skinToneOpt" value="1F3FD" /> <span class="tone-swatch tone-3"></span> Medium</label>
+    <label><input type="radio" name="skinToneOpt" value="1F3FE" /> <span class="tone-swatch tone-4"></span> Med‑dark</label>
+    <label><input type="radio" name="skinToneOpt" value="1F3FF" /> <span class="tone-swatch tone-5"></span> Dark</label>
+    <label><input id="toggleAllTones" type="checkbox" /> Show all tones</label>
+  </fieldset>
+</section>
+
+<section id="sentence-section">
+  <h2 class="section">Sentence:</h2>
+  <div id="sentence"></div>
+</section>
+
+<h2 class="section">Results:</h2>
+<div id="results"></div>
+<div id="attribution"></div>
+
+<!-- ---------- CORE SCRIPT (v3.2) ---------- -->
+<script>
+/*  
+  FULL TONE‑VARIANT ENGINE — v3.2  
+  Uses Emojibase dataset (MIT license).
+  Handles:
+  • Global tone preference
+  • Show all tones
+  • Per‑tile tone override
+  • Hex → glyph conversion
+  • Twemoji FE0F stripping rule
+  • OpenMoji uppercase
+  • Noto Emoji "emoji_uXXXX" naming
+*/
+
+const EMOJIBASE_URL =
+  "https://cdn.jsdelivr.net/npm/emojibase-data@17.0.0/en/data.json";
+
+let EMOJI_DATA = null;
+let EMOJI_FAILED = false;
+
+async function loadEmoji() {
+  if (EMOJI_DATA || EMOJI_FAILED) return EMOJI_DATA || [];
+  try {
+    const res = await fetch(EMOJIBASE_URL, { cache: "no-cache" });
+    if (!res.ok) throw new Error("HTTP " + res.status);
+    EMOJI_DATA = await res.json();
+    return EMOJI_DATA;
+  } catch (e) {
+    console.warn("Emojibase failed", e);
+    EMOJI_FAILED = true;
+    return [];
+  }
+}
+
+/* ---------- Tone helpers ---------- */
+const TONE_CODES = ["1F3FB","1F3FC","1F3FD","1F3FE","1F3FF"];
+const toneIndexFromHex = v => {
+  if (!v) return null;
+  const idx = TONE_CODES.indexOf(v.toUpperCase());
+  return idx >= 0 ? idx + 1 : null;
+};
+const selectedToneIndex = () => {
+  const v = document.querySelector("input[name=skinToneOpt]:checked").value;
+  if (v === "none") return null;
+  return toneIndexFromHex(v);
+};
+
+/* FE0F rule for Twemoji — remove unless ZWJ present */
+function normalizeTwemojiHex(hex) {
+  const parts = hex.toLowerCase().split("-");
+  const hasZWJ = parts.includes("200d");
+  return parts.filter(p => p !== "fe0f" || hasZWJ).join("-");
+}
+
+function hexToGlyph(hex){
+  try {
+    return String.fromCodePoint(...hex.split("-").map(h=>parseInt(h,16)));
+  } catch { return ""; }
+}
+
+function twemojiUrl(hex){
+  return `https://cdnjs.cloudflare.com/ajax/libs/twemoji/16.0.1/72x72/${ normalizeTwemojiHex(hex) }.png`;
+}
+function openmojiUrl(hex){
+  return `https://cdn.jsdelivr.net/npm/openmoji@16.0.0/color/618x618/${ hex.toUpperCase() }.png`;
+}
+function notoUrl(hex){
+  return `https://raw.githubusercontent.com/googlefonts/noto-emoji/main/png/128/emoji_u${hex.toLowerCase().replace(/-/g,"_")}.png`;
+}
+
+/* ---------- Variant selection ---------- */
+function pickVariants(emoji, toneIndex, showAll){
+  const skins = emoji.skins || [];
+  const base = emoji.hexcode ? emoji.hexcode.toLowerCase() : null;
+
+  if (!skins.length) return base ? [base] : [];
+
+  if (showAll) return skins.map(s=>s.hexcode.toLowerCase());
+
+  if (!toneIndex) return base ? [base] : [];
+
+  // First try tone metadata
+  let match = skins.find(s=>{
+    const t = s.tone;
+    if (Array.isArray(t)) return t.includes(toneIndex);
+    return t === toneIndex;
+  });
+  if (match) return [match.hexcode.toLowerCase()];
+
+  // Fallback: check hex code content
+  const toneHex = TONE_CODES[toneIndex-1].toLowerCase();
+  match = skins.find(s => s.hexcode.toLowerCase().includes(toneHex));
+  return match ? [match.hexcode.toLowerCase()] : base ? [base] : [];
+}
+
+/* ---------- Query filter ---------- */
+function matchQuery(e, q){
+  const block = [
+    e.label, e.annotation, ...(e.tags||[]), ...(e.shortcodes||[])
+  ]
+    .filter(Boolean)
+    .map(s=>s.toLowerCase())
+    .join(" ");
+  return block.includes(q);
+}
+
+/* ---------- Search & rendering ---------- */
+async function runSearch(){
+  const query = document.getElementById("wordInput").value.trim().toLowerCase();
+  const results = document.getElementById("results");
+  results.innerHTML = "";
+  document.getElementById("attribution").textContent = "";
+
+  if (!query) return;
+
+  const data = await loadEmoji();
+  let list = data.filter(e=>matchQuery(e,query)).slice(0,60);
+
+  if (!list.length){
+    document.getElementById("attribution").textContent =
+      "No emoji found for this query.";
+    return;
+  }
+
+  const tone = selectedToneIndex();
+  const showAll = document.getElementById("toggleAllTones").checked;
+  const libs = [...document.querySelectorAll(".emoji-lib:checked")].map(e=>e.value);
+  const showGlyph = document.getElementById("toggleEmojiGlyph").checked;
+
+  list.forEach(e=>{
+    const variants = pickVariants(e, tone, showAll);
+
+    variants.forEach(hex=>{
+      const word = (e.label || e.annotation || query).toLowerCase();
+      const glyph = hexToGlyph(hex);
+
+      /* ---- GLYPH TILE ---- */
+      if (showGlyph){
+        const tile = document.createElement("div");
+        tile.className = "result";
+
+        const span = document.createElement("span");
+        span.className = "glyph";
+        span.textContent = glyph;
+        span.onclick = () => addToSentence(glyph, word);
+
+        const label = document.createElement("div");
+        label.className = "word";
+        label.textContent = word;
+
+        const sel = document.createElement("select");
+        sel.innerHTML = `
+          <option value="none">Tone…</option>
+          <option value="1F3FB">Light</option>
+          <option value="1F3FC">Med‑light</option>
+          <option value="1F3FD">Medium</option>
+          <option value="1F3FE">Med‑dark</option>
+          <option value="1F3FF">Dark</option>
+        `;
+        sel.onchange = ()=>{
+          const v = sel.value;
+          let newHex = hex;
+          if (v!=="none"){
+            const base = e.hexcode.split("-").filter(p=>!TONE_CODES.includes(p.toUpperCase()));
+            base.splice(1,0,v.toLowerCase());
+            newHex = base.join("-");
+          } else newHex = e.hexcode;
+          span.textContent = hexToGlyph(newHex);
+          if (img_tw) img_tw.src = twemojiUrl(newHex);
+          if (img_om) img_om.src = openmojiUrl(newHex);
+          if (img_no) img_no.src = notoUrl(newHex);
+        };
+
+        const badge = document.createElement("div");
+        badge.className = "badge ok";
+        badge.innerHTML = "<strong>Emoji (Font)</strong><span class='small'>Variant glyph</span>";
+
+        tile.appendChild(span);
+        tile.appendChild(label);
+        tile.appendChild(sel);
+        tile.appendChild(badge);
+        results.appendChild(tile);
+      }
+
+      /* ---- IMAGE LIBRARIES ---- */
+      let img_tw, img_om, img_no;
+
+      if (libs.includes("twemoji")){
+        const wrap=document.createElement("div");
+        wrap.className="result";
+        img_tw=document.createElement("img");
+        img_tw.src=twemojiUrl(hex);
+        img_tw.onclick=()=>addToSentence(img_tw.src,word);
+        wrap.appendChild(img_tw);
+        wrap.append(`Twemoji`);
+        results.appendChild(wrap);
+      }
+
+      if (libs.includes("openmoji")){
+        const wrap=document.createElement("div");
+        wrap.className="result";
+        img_om=document.createElement("img");
+        img_om.src=openmojiUrl(hex);
+        img_om.onclick=()=>addToSentence(img_om.src,word);
+        wrap.appendChild(img_om);
+        wrap.append("OpenMoji");
+        results.appendChild(wrap);
+      }
+
+      if (libs.includes("noto")){
+        const wrap=document.createElement("div");
+        wrap.className="result";
+        img_no=document.createElement("img");
+        img_no.src=notoUrl(hex);
+        img_no.onclick=()=>addToSentence(img_no.src,word);
+        wrap.appendChild(img_no);
+        wrap.append("Noto");
+        results.appendChild(wrap);
+      }
+
+    });
+  });
+
+  document.getElementById("attribution").textContent =
+    "Emoji data © Emojibase (MIT). Images: Twemoji CC‑BY‑4.0, OpenMoji CC‑BY‑SA‑4.0, Noto Apache‑2.0.";
+}
+
+/* ---------- Sentence ops ---------- */
+function addToSentence(srcOrGlyph, word){
+  const sentence=document.getElementById("sentence");
+  const box=document.createElement("div");
+  box.style.margin="10px"; box.style.textAlign="center";
+
+  if (srcOrGlyph.startsWith("http")){
+    const img=document.createElement("img");
+    img.src=srcOrGlyph; img.className="sentence-img";
+    box.appendChild(img);
+  } else {
+    const span=document.createElement("span");
+    span.textContent=srcOrGlyph; span.style.fontSize="80px";
+    box.appendChild(span);
+  }
+  const label=document.createElement("div");
+  label.className="sentence-label"; label.textContent=word;
+  box.appendChild(label);
+  sentence.appendChild(box);
+}
+
+function clearSentence(){ document.getElementById("sentence").innerHTML=""; }
+function speakSentence(){
+  const words=[...document.getElementById("sentence").children]
+    .map(c=>c.querySelector(".sentence-label")?.textContent);
+  if (!words.length) return;
+  speechSynthesis.speak(new SpeechSynthesisUtterance(words.join(" ")));
+}
+async function saveSentenceImage(){
+  const node=document.getElementById("sentence");
+  const canvas=await html2canvas(node);
+  const link=document.createElement("a");
+  link.download="sentence.png";
+  link.href=canvas.toDataURL();
+  link.click();
+}
+
+/* ---------- Wire controls ---------- */
+document.getElementById("btnSearch").onclick=runSearch;
+document.querySelectorAll("input[name=skinToneOpt]").forEach(r=>r.onchange=runSearch);
+document.getElementById("toggleAllTones").onchange=runSearch;
+document.getElementById("toggleEmojiGlyph").onchange=runSearch;
+document.querySelectorAll(".emoji-lib").forEach(cb=>cb.onchange=runSearch);
+document.getElementById("demoDog").onclick=()=>{ wordInput.value="thumbs up"; runSearch(); };
+
+</script>
+
+</body>
+</html>
